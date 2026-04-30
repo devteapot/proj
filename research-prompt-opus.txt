@@ -1,0 +1,25 @@
+Research the concept of "neural app runtime" / "projection-based applications" — where a neural network's internal state IS the application, and the user interface is a real-time rendering/projection of that state, not code-generated UI.
+
+Background: Karpathy's "Software 2.0" (2017) established that neural weights are code. His 2026 AI Ascent talk extended this — the neural net's internal state is the application, and the interface is a projection of that state. The code layer disappears from the outside world. The LLM's weights hold the app. The projection (UI, CLI, whatever interface) is the only thing visible to users.
+
+This is distinct from:
+- Generative UI (where models generate HTML)
+- A2UI (where agents send UI component data)
+- AG-UI (protocol for agent↔UI communication)
+- Cursor/Copilot (agents write code files)
+- LLM agents with tools
+
+The core idea: the model holds the app's state machine, domain logic, and data internally. The UI is a projection of that state. There is no code layer between user and app.
+
+Research these areas deeply:
+1. Academic: "neural program synthesis", "extracting programs from neural networks", "neural text interface", "program synthesis from language models", "world models as applications", "differentiable programming runtime"
+2. Systems: Any system where the UI is generated from model state rather than code or templates
+3. Protocol work: Any protocols for agent↔UI communication (A2UI, AG-UI, MCP UI, etc.)
+4. Startups/companies: Any company building "AI-native apps" or "neural-first" software
+5. State management: Papers on LLM state representation, persistent memory for agents, state machines in LLMs
+
+Use web_search extensively with many queries. Search Google Scholar, arXiv, academic databases, and the general web. Be very thorough — do many searches across many angles.
+
+Write comprehensive research findings to: /Users/sloppy/dev/proj/experiments/codex-research-opus.md
+
+Format: For each finding, include name, URL, date, summary, and analysis of how it relates to or differs from the projection concept. Be critical — don't just describe, analyze the gap between existing work and the projection concept.
