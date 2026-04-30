@@ -36,10 +36,11 @@ Strong projection means:
 ## Reading Order
 
 1. [`references/consolidated-research.md`](references/consolidated-research.md) — canonical research synthesis.
-2. [`experiments/codex-research-opus.md`](experiments/codex-research-opus.md) — sharper critical survey; identifies Mirage/world-model analogues.
-3. [`experiments/codex-research-gpt55.md`](experiments/codex-research-gpt55.md) — broader survey of adjacent academic/protocol/startup work.
-4. [`experiments/ARCHITECTURE.md`](experiments/ARCHITECTURE.md) — audited architecture plan split into weak, hybrid, and strong prototype tracks.
-5. [`references/source-status.md`](references/source-status.md) — citation hygiene and source-confidence notes.
+2. [`references/slop-fit.md`](references/slop-fit.md) — SLOP fit analysis: projection protocol, not neural runtime.
+3. [`experiments/codex-research-opus.md`](experiments/codex-research-opus.md) — sharper critical survey; identifies Mirage/world-model analogues.
+4. [`experiments/codex-research-gpt55.md`](experiments/codex-research-gpt55.md) — broader survey of adjacent academic/protocol/startup work.
+5. [`experiments/ARCHITECTURE.md`](experiments/ARCHITECTURE.md) — audited architecture plan split into weak, hybrid, and strong prototype tracks.
+6. [`references/source-status.md`](references/source-status.md) — citation hygiene and source-confidence notes.
 
 ## Prototype Strategy
 
@@ -65,11 +66,11 @@ Open-model experiment where hidden/KV/activation state is inspected, snapshotted
 
 ## Relation to SLOP
 
-`proj` can become a SLOP use case, but it should keep the distinction clean:
+SLOP fits this repo as a **projection protocol**, not as the neural runtime itself. See [`references/slop-fit.md`](references/slop-fit.md).
 
-- SLOP/session providers can support **hybrid projection** immediately.
-- SLOP orchestration can run projection loops and validation harnesses.
-- A true **strong projection** runtime would require model-internal state instrumentation beyond ordinary session persistence.
+- For **Track A**, SLOP can render live semantic state into an ephemeral `<slop-state>` context tail, giving weak projection a cleaner implementation than transcript soup.
+- For **Track B**, SLOP is probably the best near-term state/action boundary: explicit state tree, contextual affordances, salience, snapshots, patches, and validation around invokes.
+- For **Track C**, SLOP can expose decoded/probed latent state for inspection, but the actual strong claim still requires model-internal state instrumentation beyond ordinary SLOP trees.
 
 ## Structure
 
@@ -80,6 +81,7 @@ proj/
 ├── references/
 │   ├── README.md                     # index and summary
 │   ├── consolidated-research.md      # canonical survey
+│   ├── slop-fit.md                   # SLOP fit: projection protocol, not runtime
 │   └── source-status.md              # citation/source audit
 └── experiments/
     ├── ARCHITECTURE.md               # prototype tracks after audit

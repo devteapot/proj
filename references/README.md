@@ -4,9 +4,10 @@ This directory contains the research survey for `proj`: neural app runtimes and 
 
 ## Canonical Reference
 
-Read this first:
+Read these first:
 
 - [`consolidated-research.md`](consolidated-research.md) — merged survey and thesis synthesis from the two model-assisted research runs.
+- [`slop-fit.md`](slop-fit.md) — analysis of SLOP as a projection protocol for weak/hybrid projection apps, not a strong neural runtime.
 
 Supporting audit file:
 
@@ -48,6 +49,7 @@ Direct or near-direct:
 - Mirage demonstrates a transcript-mediated hallucinated app loop; it does **not** prove hidden-state persistence.
 - World models show networks can simulate environments; they do **not** solve app invariants, transactions, auth, or debugging.
 - JSON-in-context prototypes are hybrid systems, not strong neural app runtimes.
+- SLOP state trees are explicit semantic projections; they support weak/hybrid projection but do **not** make the model-internal state authoritative.
 - Two research runs using near-identical prompts are useful triangulation, not independent empirical corroboration.
 
 ## Open Research Problems

@@ -73,6 +73,7 @@ Under this strict reading, **no mature system exists today**. The research from 
 |---|---|---|
 | **Generative UI** | Google Gemini, CopilotKit, CopilotKit generative-ui repo | Model generates HTML. Each interaction is roughly self-contained. HTML is the output, not a projection. |
 | **Agent↔UI Protocols** | A2UI, AG-UI, MCP UI, Thesys C1 | Model emits structured UI data/specs. Deterministic client code renders it. Model is a generator, not a runtime. |
+| **Projection/state protocols** | SLOP | Explicit semantic state tree plus contextual affordances. Strong substrate for weak/hybrid projection, but state is externalized unless backed by model internals. |
 | **AI App Builders** | Lovable, Bolt, v0, Replit, Cursor | Model writes conventional code. The generated code IS the app. The model is gone at runtime. |
 | **Agent Memory Systems** | Letta, MemGPT, Cloudflare Agent Memory | Model is a CPU that reads/writes to external memory. Not trusted to hold state. |
 | **LLM-as-OS** | AIOS, AgentOS, Qualixar OS, Karpathy's "LLM kernel" | Model is a scheduler/orchestrator over external systems. Applications still live below it. |
@@ -148,11 +149,13 @@ If someone wanted to prototype this today, the closest ingredients from existing
 
 1. **World-model latent state** — from World Models / Dreamer-style research
 2. **Persistent agent memory** — from MemGPT / Letta-style architectures
-3. **Projection surface protocols** — from AG-UI, A2UI, or MCP Apps
+3. **Projection surface protocols** — from SLOP for semantic state/affordances; AG-UI, A2UI, or MCP Apps for UI/host surfaces
 4. **Interpretability / decodability tools** — from DecNN, mechanistic interpretability, probe-based analysis
 5. **Mirage pattern** — re-derive each tick from interaction history, no persistent code layer
 
-But combining them would still produce a **hybrid system** unless state were deliberately kept *inside* the model rather than mirrored into explicit stores and schemas.
+SLOP is the strongest local candidate for the **weak/hybrid projection protocol boundary**: live semantic state tree, contextual affordances, salience, snapshots, patches, and model-context injection. It should be treated as explicit-state infrastructure, not as proof of a neural app runtime; see [`slop-fit.md`](slop-fit.md).
+
+But combining these ingredients would still produce a **hybrid system** unless state were deliberately kept *inside* the model rather than mirrored into explicit stores and schemas.
 
 ---
 

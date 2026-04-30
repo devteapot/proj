@@ -323,16 +323,41 @@ Validation layers should include:
 
 ## Relation to SLOP
 
-SLOP can support Tracks A and B immediately as orchestration/session infrastructure. For Track C, SLOP would need an adapter around an open inference runtime that can expose and checkpoint model internals.
+SLOP should be used here as the **projection protocol for explicit-state experiments**, not as evidence that the app lives inside a model. The dedicated fit note is [`../references/slop-fit.md`](../references/slop-fit.md).
 
 Potential mapping:
 
-| SLOP concept | Track A/B role | Track C role |
-|---|---|---|
-| Session provider | transcript/state persistence | metadata around latent snapshots |
-| Runtime | projection loop | instrumented inference loop |
-| Orchestration | validator/projection coordination | probe/snapshot/intervention coordination |
-| Protocol | UI/event transport | projection plus latent-state diagnostics |
+| SLOP concept | Track A — weak role | Track B — hybrid role | Track C — strong role |
+|---|---|---|---|
+| State tree | Prompt-visible current app surface in `<slop-state>` | Canonical semantic projection of explicit JSON/db/event state | Decoded/probed view of latent state for inspection only |
+| Affordances | Contextual actions attached to visible projected state | Validated mutation boundary around explicit state | Diagnostic/control hooks around experiment harness |
+| Snapshots/patches | Fresh current observation without stale transcript buildup | Replayable, testable state evolution | Compare decoded latent state over time |
+| Salience/summaries/windowing | Keep weak projection within context budget | Scale explicit-state projected apps | Choose what latent diagnostics enter the observer tree |
+| Content references | Avoid stuffing large prompt-visible content into the tail | On-demand document/log/file access | Attach probe artifacts, traces, and decoded snapshots |
+
+### SLOP Track A pattern
+
+```text
+Toy app state -> SLOP provider -> canonical text tree -> ephemeral <slop-state> tail -> model -> invoke
+```
+
+This is a better weak-projection baseline than raw transcript replay because stale state tails are not persisted in conversation history.
+
+### SLOP Track B pattern
+
+```text
+Explicit store -> SLOP tree -> model sees state + affordances -> invoke -> provider validates -> explicit mutation -> patches
+```
+
+This is the recommended first serious build: useful, inspectable, and honest that the state is symbolic.
+
+### SLOP Track C pattern
+
+```text
+Open model internals -> probe/decoder -> SLOP tree -> evaluator/UI
+```
+
+Here SLOP is only the observer/projection layer. The strong claim still depends on showing that the authoritative state is recoverable from, mutable in, and restorable through model internals rather than copied into the SLOP tree.
 
 ## Open Questions
 
