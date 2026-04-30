@@ -1,222 +1,353 @@
-# Architecture — Projection Runtime
+# Architecture — Projection Runtime Experiments
 
-## Design Principles
+This document reflects the audit finding: the original p0 design was a useful LLM/JSON app harness, but it did **not** prove the strong “model is the app” thesis. This version separates the prototype space into explicit tracks so the repo does not overclaim.
 
-1. **The model is the app.** The neural network's weights + internal state hold the entire application. No code files define behavior.
-2. **The UI is a projection.** The interface is generated in real-time from the model's current state, not from templates or code.
-3. **State is first-class.** The application's state is a structured representation maintained by the model, not a side effect of code execution.
-4. **Projection is verifiable.** Every rendering must be checkable for consistency with the internal state.
+## Design Principle
 
-## Core Concepts
+Be precise about where application state lives.
 
-### Internal Application State (IAS)
+| State surface | What it is | Does it prove strong projection? |
+|---|---|---|
+| Weights | Learned model parameters | Only if app behavior/state is trained into weights; usually static, not session state |
+| Activations / recurrent state / KV cache | Inference-time hidden state | Candidate strong-projection state |
+| Prompt-visible context / transcript | Explicit symbolic tokens supplied to the model | Weak projection, not hidden-state proof |
+| JSON/db/files | Ordinary external state | Hybrid projection, not neural runtime proof |
+| Generated HTML/JS/UI schema | Rendered or executable artifact | View layer or code layer, not app identity |
 
-The IAS is the structured representation of the application's state as maintained by the model. It's not the model's weights (those are the app's *knowledge*). The IAS is the app's *current condition* — what data it holds, what the user is doing, what context is active.
+A prototype may use any of these, but it must label itself honestly.
+
+## Core Terms
+
+### Strong Projection
+
+The model's internal state is the authoritative application state. The UI is a projection of that state. External artifacts may exist for display, logging, or safety, but they are not the canonical runtime.
+
+Requirements:
+
+1. State is represented in neural internals: activations, KV cache, recurrent memory, latent state, or trained weights.
+2. State can be observed or decoded without relying only on generated self-reports.
+3. State can be mutated through interaction.
+4. State can be snapshotted, restored, perturbed, or probed.
+5. Projection fidelity can be tested independently.
+
+### Weak Projection
+
+The model simulates an app over a transcript. Each interaction is fed back to the model, which emits the next UI. This is the Mirage/Websim pattern.
+
+Useful for:
+
+- testing malleable UX,
+- measuring state drift,
+- exploring “no app-specific code” interaction loops.
+
+Not proof of:
+
+- hidden-state persistence,
+- durable identity,
+- transactional semantics,
+- real model-internal app state.
+
+### Hybrid Projection
+
+A conventional state substrate exists — JSON, database, files, event log — and the model mutates or renders it. This is practical and probably the fastest useful demo.
+
+Useful for:
+
+- building a working product surface,
+- validating projection UX,
+- creating test suites and invariant checks,
+- later comparing against strong-projection experiments.
+
+Not proof that:
+
+- the model is the app.
+
+## Prototype Tracks
+
+## Track A — Weak Projection / Mirage-Style Loop
+
+### Goal
+
+Build the smallest code-less hallucinated app loop:
+
+```text
+Domain prompt + interaction history + user event
+    -> model
+    -> next UI projection
+```
+
+### Scope
+
+- Input: domain description, user interactions, current transcript.
+- Output: HTML/text/structured UI for the next screen.
+- No app-specific business logic outside the model prompt.
+- The host only captures interactions and displays the returned projection.
+
+### Architecture
+
+```text
+User event
+   │
+   ▼
+Interaction capture ──► Transcript builder ──► Model call ──► UI projection
+                                                     │              │
+                                                     ▼              ▼
+                                               Raw response     Rendered view
+```
+
+### What It Tests
+
+- How far a model can simulate a small app from interaction history.
+- How quickly state drifts.
+- Whether users tolerate per-interaction generation latency.
+- Whether generated UI remains interactable over many turns.
+
+### What It Does Not Test
+
+- Hidden/KV state as the application.
+- Durable persistence beyond transcript/context.
+- Strong invariants.
+
+### Minimum Evaluation
+
+1. Run scripted app tasks: todo list, notes, tiny CRM.
+2. Measure state loss over 50/100/200 interactions.
+3. Inject adversarial user inputs that try to corrupt state.
+4. Compare visible UI against a test oracle reconstructed from the transcript.
+5. Track latency per interaction.
+
+## Track B — Hybrid Projection Harness
+
+### Goal
+
+Build a useful, testable projection-style app runtime with explicit state. This is the pragmatic engineering baseline, not the strong thesis.
+
+```text
+User event
+   │
+   ▼
+Explicit state manager ──► model-assisted transition ──► explicit state update
+        │                                                        │
+        └────────────────────► projection renderer ◄─────────────┘
+                                      │
+                                      ▼
+                                   UI output
+```
+
+### State Model
+
+State is explicit JSON or an event log. Example:
 
 ```json
 {
   "session_id": "abc123",
-  "app_state": {
-    "domain": "notes",
-    "documents": [...],
-    "active_document": "doc-1",
-    "user_preferences": {},
-    "history": [...]
-  },
+  "domain": "notes",
+  "records": [],
+  "active_record_id": null,
+  "history": [],
   "metadata": {
     "created_at": "...",
-    "last_modified": "...",
     "model_version": "..."
   }
 }
 ```
 
-The IAS is **not** stored in files. It's maintained in the model's context window (or external memory layer) and mutated through interactions. The model *owns* the state.
-
-### Projection Protocol
-
-The protocol for how the model communicates its state to the renderer. Unlike A2UI (which sends UI data) or Generative UI (which sends HTML), the projection protocol sends the **internal state** and lets the renderer choose how to display it.
-
-```
-Model → Projection Protocol → Renderer
-(what the model knows)     (how to show it)
-```
-
-The renderer can output: text, HTML, JSON, voice, structured forms, whatever the client supports.
-
-### Validation Layer
-
-The validation layer checks that the projection matches the internal state. Two key checks:
-
-1. **Faithfulness:** Does the rendered output correctly represent what the model knows? (Not hallucinating data, not omitting state)
-2. **Consistency:** Is the internal state self-consistent? (No contradictions, no drift)
-
-### The Projection Loop
-
-```
-1. User provides input (text, command, interaction)
-2. Model processes input, updates IAS
-3. Model generates projection of current IAS
-4. Validation layer checks projection fidelity
-5. Renderer displays projection to user
-6. User interacts → repeat
-```
-
-## Minimal Prototype: p0
-
-### Scope
-
-Build the simplest possible proof that a model can maintain internal app state and project it through a renderable interface.
-
-### What It Does
-
-A CLI-based "app" where:
-1. You define a domain (e.g., "a notes app", "a todo app", "a simple CRM")
-2. The model initializes an IAS for that domain
-3. You interact with the model using natural language
-4. After each interaction, the model outputs a structured projection of its current IAS
-5. You can inspect the projection to verify the model's internal state
+This is **not** internal model state. It is external symbolic state.
 
 ### Components
 
-#### 1. State Manager
+#### 1. State Store
 
-Manages the IAS as structured data passed in the prompt context.
+Owns the canonical JSON/event-log state.
 
-```python
-class StateManager:
-    def init(self, domain_spec):
-        """Initialize IAS for a domain (e.g., notes, todos)"""
-        ...
+Responsibilities:
 
-    def update(self, interaction):
-        """Update IAS based on user interaction"""
-        ...
+- load/save sessions,
+- validate schema,
+- apply accepted mutations,
+- keep audit history.
 
-    def get_state(self):
-        """Get current structured state"""
-        ...
+#### 2. Transition Proposer
+
+Uses the model to propose a state delta from user input.
+
+```json
+{
+  "intent": "create_note",
+  "delta": [{ "op": "add", "path": "/records/-", "value": { "title": "Meeting" } }],
+  "rationale": "User asked to create a note titled Meeting."
+}
 ```
 
-#### 2. Projection Generator
+#### 3. Deterministic Validator
 
-Takes the IAS and generates a projection (text + structured format).
+Checks deltas without trusting model self-evaluation.
 
-```python
-class ProjectionGenerator:
-    def generate(self, ias):
-        """Generate human-readable + machine-verifiable projection"""
-        return {
-            "text": "rendered view for user",
-            "structured": ias,
-            "fingerprint": hash(ias)  # for validation
-        }
+Rules:
+
+- schema validity,
+- invariant preservation,
+- authorization,
+- no impossible transitions,
+- no undeclared destructive changes.
+
+#### 4. Projection Renderer
+
+Can be model-assisted or deterministic, but must be evaluated against explicit state.
+
+#### 5. Test Harness
+
+Runs scripted interaction suites and compares final state/projection to expected outcomes.
+
+### What It Tests
+
+- Projection UX.
+- Delta validation.
+- Invariant design.
+- Failure modes of model-suggested state transitions.
+- Baselines for later strong-projection experiments.
+
+### What It Does Not Test
+
+- Whether hidden state can be the application.
+
+## Track C — Strong Projection / Latent-State Experiment
+
+### Goal
+
+Test the actual thesis: can model internals act as the application state?
+
+This requires an open model or runtime that exposes internals. Closed hosted APIs are insufficient because they do not expose activations/KV cache reliably enough for inspection, snapshotting, or perturbation.
+
+### Candidate Experiment
+
+Use a tiny domain with hard invariants, e.g. a counter, todo list, inventory ledger, or finite-state workflow.
+
+```text
+User event
+   │
+   ▼
+Open model inference ──► hidden/KV state snapshot ──► probe/decoder ──► recovered app state
+        │                         │                         │
+        │                         └──── restore/perturb ◄────┘
+        ▼
+UI projection
 ```
 
-#### 3. Validator
+### Requirements
 
-Checks that the projection matches the IAS.
+1. **No authoritative external app state** during the main run.
+2. Capture hidden states / KV cache after each interaction.
+3. Train or define probes that recover app state from internals.
+4. Snapshot and restore model-internal state if technically possible.
+5. Perturb candidate state dimensions and observe projection changes.
+6. Evaluate against an external oracle used only for testing, not runtime.
 
-```python
-class Validator:
-    def check(self, projection, ias):
-        """Verify projection fidelity"""
-        # Check that all state is represented
-        # Check no extraneous data
-        # Return pass/fail + diff
-        ...
+### Minimum Tests
+
+#### State Recovery
+
+Can a probe recover the app state from activations/KV better than chance and better than transcript-only baselines?
+
+#### Persistence
+
+Can the system resume from a saved internal state without replaying the full transcript?
+
+#### Invariants
+
+Can it preserve simple invariants?
+
+Examples:
+
+- item IDs are unique,
+- completed count equals completed items,
+- inventory cannot go negative,
+- workflow cannot skip required approval states.
+
+#### Counterfactual Intervention
+
+If a latent feature corresponding to “active note” or “counter value” is changed, does the projected UI change accordingly?
+
+#### Projection Fidelity
+
+Does the UI projection reflect the decoded latent state, not just the latest textual self-report?
+
+### What Success Would Mean
+
+A successful Track C result would not prove a full neural app runtime, but it would establish a falsifiable foothold: model internals can carry small, queryable, mutable application state across interactions.
+
+## Validation Principles
+
+Avoid circular validation.
+
+Bad:
+
+```text
+model generates state
+model generates projection
+model judges whether projection matches state
 ```
 
-#### 4. CLI Runner
+Better:
 
-Ties it together:
-
-```
-$ proj run --domain notes
-
-> Create a note titled "Meeting"
-> [Model processes, updates IAS]
-> Projection:
-> ├── State: notes app
-> ├── Active: "Meeting"
-> ├── Content: ...
-> └── Fingerprint: abc123
-> ✓ Validation passed
-
-> Update note content: "Discussed proj architecture"
-> [Model processes, updates IAS]
-> Projection:
-> ├── State: notes app
-> ├── Active: "Meeting"
-> ├── Content: "Discussed proj architecture"
-> └── Fingerprint: def456
-> ✓ Validation passed
+```text
+runtime records user events
+independent test oracle computes expected constraints
+projection/state are checked by deterministic validators and/or separately trained probes
+failures are logged as diffs
 ```
 
-### Implementation
+Validation layers should include:
 
-- **Language:** Python (accessible, good LLM API support)
-- **Model:** Any LLM API (OpenAI, Anthropic, local via vLLM)
-- **Output:** Structured JSON + formatted text
-- **State:** Stored as JSON in context, persisted to disk between sessions
+- deterministic schema checks,
+- invariant checks,
+- replay tests,
+- differential tests against a conventional reference app,
+- adversarial input suites,
+- probe-based latent-state recovery for Track C.
 
-### What This Proves
+## Recommended Build Order
 
-1. **A model can hold app state in context** and mutate it through interaction
-2. **The projection is a faithful rendering** of the internal state (verifiable)
-3. **The model is the app** — no code files define behavior, only the model's knowledge and the projection protocol
-4. **State persists across turns** — the model remembers what was created/modified
+1. **Track A** — Clone the Mirage pattern locally to understand weak projection and UX drift.
+2. **Track B** — Build the hybrid harness as the practical baseline and testbed.
+3. **Track C** — Run small open-model latent-state experiments to test the strong claim.
+4. Compare A/B/C on the same tiny domains and publish failure modes.
 
-### What This Doesn't Do (Yet)
+## Non-Goals For Now
 
-- No persistent storage (just context window + disk JSON)
-- No real UI rendering (just structured text/JSON output)
-- No weight-based state (the model's knowledge is generic, not app-specific)
-- No multi-model support
-- No validation against actual execution (just structural checks)
+- Production app framework.
+- Multi-user support.
+- Payments, auth, or sensitive data.
+- Claims that context JSON proves hidden-state applications.
+- Claims that generative UI protocols are already neural app runtimes.
 
-## Evolution Path
+## Relation to SLOP
 
-### Phase 1 (p0): CLI projection runner
-- Verify the core concept works with any model
-- Structured state + projection + validation in a loop
+SLOP can support Tracks A and B immediately as orchestration/session infrastructure. For Track C, SLOP would need an adapter around an open inference runtime that can expose and checkpoint model internals.
 
-### Phase 2: Persistent sessions
-- Store IAS to disk between runs
-- Load/restore state on session start
-- Version control for state (like git for app state)
+Potential mapping:
 
-### Phase 3: Renderer plugins
-- Pluggable renderers: text, HTML, JSON, voice
-- Same projection → different outputs based on renderer
+| SLOP concept | Track A/B role | Track C role |
+|---|---|---|
+| Session provider | transcript/state persistence | metadata around latent snapshots |
+| Runtime | projection loop | instrumented inference loop |
+| Orchestration | validator/projection coordination | probe/snapshot/intervention coordination |
+| Protocol | UI/event transport | projection plus latent-state diagnostics |
 
-### Phase 4: Model-specific apps
-- Fine-tune models on specific app domains
-- The model's weights become the app's "program"
-- Faster inference, more coherent state
+## Open Questions
 
-### Phase 5: Full runtime
-- SLOP integration for orchestration
-- Multi-model coordination
-- Real UI rendering (web, mobile, voice)
+1. Can KV cache snapshots function as resumable app state, or are they too brittle?
+2. Can latent probes recover structured business state reliably?
+3. Is any strong-projection design debuggable enough to be useful?
+4. Are symbolic stores fundamentally necessary for transactional apps?
+5. What is the smallest non-toy domain where strong projection beats a hybrid?
 
-## Connection to SLOP
+## Bottom Line
 
-This prototype can be built on top of SLOP:
+The immediate architecture should be honest:
 
-- **Session provider** → State Manager (persistent state across interactions)
-- **Runtime** → CLI Runner (the execution loop)
-- **Orchestration** → Projection loop (coordinate state, projection, validation)
-- **Protocol** → Projection Protocol (standardized state→UI translation)
+- Track A proves hallucinated UI loops are possible.
+- Track B proves projection-style UX can be engineered safely with explicit state.
+- Track C is the actual research bet.
 
-The proj project is essentially SLOP applied to neural-native applications: the model is the app, the protocol is the projection layer, and the runtime manages the state machine.
-
-## Risks and Open Questions
-
-1. **State drift:** Over long interactions, the model's internal state may drift from its original state. How do we detect and correct this?
-2. **Validation accuracy:** How reliably can we verify that a projection matches the internal state? The model generates both, so there's a circularity risk.
-3. **State capacity:** The context window has limits. How do we scale beyond what fits in a single prompt?
-4. **Determinism:** LLMs are probabilistic. Two identical interactions may produce different internal states. How do we ensure reproducibility?
-5. **The "code" question:** If the model is the app and code is just a projection, how do we debug when the projection is wrong? Who fixes the model's understanding?
-
-These are all active research questions — and opportunities.
+Only Track C can justify the phrase **“the model is the app.”**
